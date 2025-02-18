@@ -1,3 +1,5 @@
+Project Date: Feb 17, 2025
+
 This study was started with the purpose of concretely defining what "short", "medium" and, "long" mean when defining football distances. 
 In the traditional sense, it is thought that there are three clusters of yards to go for a first down, with each having a lower likelihood than the next of successful conversion. 
 
