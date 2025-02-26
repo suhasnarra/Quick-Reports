@@ -1,0 +1,52 @@
+---
+title: "Third&Long"
+author: "Suhas Narra"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+install.packages("nflfastR")
+library(tidyverse)
+library(ggrepel)
+library(nflreadr)
+library(nflplotR)
+library(knitr)
+library(ggplot2)
+options(scipen = 9999)
+data <- load_pbp(2021:2024)
+echo = FALSE
+```
+
+```{r, echo = echo}
+ filtered_data <- data %>% 
+  filter(down == 3, !is.na(third_down_converted), ydstogo <= 20) %>% 
+  select(down, ydstogo, third_down_converted) %>% 
+  group_by(down, ydstogo) %>% 
+  summarise(
+    completion_percentage = (sum(third_down_converted == 1) / n()) * 100,
+    .groups = "drop"
+  )
+# Create the linear model
+model <- lm(completion_percentage ~ ydstogo, data = filtered_data)
+
+# Extract the coefficients
+intercept <- round(coef(model)[1], 2)
+slope <- round(coef(model)[2], 2)
+
+# Create the equation as a text label
+equation <- paste0("y = ", slope, "x + ", intercept)
+
+# Scatter plot with regression line and equation
+ggplot(filtered_data, aes(x = ydstogo, y = completion_percentage)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  annotate("text", x = max(filtered_data$ydstogo) - 2, 
+           y = max(filtered_data$completion_percentage) - 5, 
+           label = equation, color = "black", size = 5, hjust = 1) +
+  labs(title = "Third Down Completion Percentage vs. Yards to Go",
+       x = "Yards to Go",
+       y = "Completion Percentage") +
+  theme_minimal()
+```
