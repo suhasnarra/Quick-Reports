@@ -7,7 +7,6 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-install.packages("nflfastR")
 library(tidyverse)
 library(ggrepel)
 library(nflreadr)
@@ -20,7 +19,7 @@ echo = FALSE
 ```
 
 ```{r, echo = echo}
- filtered_data <- data %>% 
+ third_down_data <- data %>% 
   filter(down == 3, !is.na(third_down_converted), ydstogo <= 20) %>% 
   select(down, ydstogo, third_down_converted) %>% 
   group_by(down, ydstogo) %>% 
@@ -29,7 +28,7 @@ echo = FALSE
     .groups = "drop"
   )
 # Create the linear model
-model <- lm(completion_percentage ~ ydstogo, data = filtered_data)
+model <- lm(completion_percentage ~ ydstogo, data = third_down_data)
 
 # Extract the coefficients
 intercept <- round(coef(model)[1], 2)
@@ -39,14 +38,276 @@ slope <- round(coef(model)[2], 2)
 equation <- paste0("y = ", slope, "x + ", intercept)
 
 # Scatter plot with regression line and equation
-ggplot(filtered_data, aes(x = ydstogo, y = completion_percentage)) +
+ggplot(third_down_data, aes(x = ydstogo, y = completion_percentage)) +
   geom_point(color = "blue") +
   geom_smooth(method = "lm", color = "red", se = FALSE) +
-  annotate("text", x = max(filtered_data$ydstogo) - 2, 
-           y = max(filtered_data$completion_percentage) - 5, 
+  annotate("text", x = max(third_down_data$ydstogo) - 2, 
+           y = max(third_down_data$completion_percentage) - 5, 
            label = equation, color = "black", size = 5, hjust = 1) +
   labs(title = "Third Down Completion Percentage vs. Yards to Go",
        x = "Yards to Go",
        y = "Completion Percentage") +
   theme_minimal()
+```
+Third Down Range Clustering
+```{r, echo = echo}
+third_down_data <- data %>% 
+  filter(down == 3, !is.na(third_down_converted), ydstogo <= 10) %>% 
+  select(down, ydstogo, third_down_converted) %>% 
+  group_by(down, ydstogo) %>% 
+  summarise(
+    completion_percentage = (sum(third_down_converted == 1) / n()) * 100,
+    .groups = "drop"
+  )
+
+# Perform K-means clustering with 3 clusters
+set.seed(123)
+kmeans_result <- kmeans(third_down_data$completion_percentage, centers = 3, nstart = 25)
+
+# Add cluster labels to dataframe
+third_down_data$distance <- as.factor(kmeans_result$cluster)
+
+# View cluster assignments
+print(third_down_data)
+
+third_down_data <- third_down_data %>% 
+  mutate(distance = case_when(
+    distance == 3 ~ "Short",
+    distance == 2 ~ "Long",
+    distance == 1 ~ "Medium"
+  ))
+
+kable(
+  third_down_data,
+  col.names = c(
+    "Down",
+    "Dist",
+    "Conversion Rate",
+    "Dist Range"
+  ),
+  caption = "Third Down Distance and Range",
+  digits = 3, # Limit decimals for numeric columns
+  align = "c"
+)
+```
+
+Second Down Range Clustering
+```{r, echo = echo}
+second_down_data <- data %>% 
+  filter(down == 2, ydstogo <= 10) %>% 
+  select(down, ydstogo, first_down_rush, first_down_pass) %>%
+  print(second_down_data) %>% 
+  group_by(down, ydstogo) %>% 
+  print(second_down_data) %>% 
+  summarise(
+    completion_percentage = ((sum(first_down_rush, na.rm = TRUE) + sum(first_down_pass, na.rm = TRUE)) / n()) * 100,
+    .groups = "drop"
+  )
+
+# Perform K-means clustering with 3 clusters
+set.seed(123)
+kmeans_result <- kmeans(second_down_data$completion_percentage, centers = 3, nstart = 25)
+
+# Add cluster labels to dataframe
+second_down_data$distance <- as.factor(kmeans_result$cluster)
+
+# View cluster assignments
+print(second_down_data)
+
+second_down_data <- second_down_data %>% 
+  mutate(distance = case_when(
+    distance == 3 ~ "Medium",
+    distance == 2 ~ "Long",
+    distance == 1 ~ "Short"
+  ))
+
+kable(
+  second_down_data,
+  col.names = c(
+    "Down",
+    "Dist",
+    "Conversion Rate",
+    "Dist Range"
+  ),
+  caption = "Second Down Distance and Range",
+  digits = 3, # Limit decimals for numeric columns
+  align = "c"
+)
+```
+
+First Down Range clustering
+```{r, echo = echo}
+first_down_data <- data %>% 
+  filter(down == 1, ydstogo <= 10) %>% 
+  select(down, ydstogo, first_down_rush, first_down_pass) %>%
+  print(first_down_data) %>% 
+  group_by(down, ydstogo) %>% 
+  print(first_down_data) %>% 
+  summarise(
+    completion_percentage = ((sum(first_down_rush, na.rm = TRUE) + sum(first_down_pass, na.rm = TRUE)) / n()) * 100,
+    .groups = "drop"
+  )
+
+# Perform K-means clustering with 3 clusters
+set.seed(123)
+kmeans_result <- kmeans(first_down_data$completion_percentage, centers = 3, nstart = 25)
+
+# Add cluster labels to dataframe
+first_down_data$distance <- as.factor(kmeans_result$cluster)
+
+# View cluster assignments
+print(first_down_data)
+
+first_down_data <- first_down_data %>% 
+  mutate(distance = case_when(
+    distance == 3 ~ "Short",
+    distance == 2 ~ "Long",
+    distance == 1 ~ "Medium"
+  ))
+
+kable(
+  first_down_data,
+  col.names = c(
+    "Down",
+    "Dist",
+    "Conversion Rate",
+    "Dist Range"
+  ),
+  caption = "First Down Distance and Range",
+  digits = 3, # Limit decimals for numeric columns
+  align = "c"
+)
+```
+
+Third down Fuzzy C-means
+```{r, echo = echo}
+library(e1071)
+
+third_down_data <- data %>% 
+  filter(down == 3, !is.na(third_down_converted), ydstogo <= 10) %>% 
+  select(down, ydstogo, third_down_converted) %>% 
+  group_by(down, ydstogo) %>% 
+  summarise(
+    completion_percentage = (sum(third_down_converted == 1) / n()) * 100,
+    .groups = "drop"
+  )
+
+normalize <- function(x) (x - min(x)) / (max(x) - min(x))
+third_down_data$completion_percentage_2 <- normalize(third_down_data$completion_percentage)
+set.seed(123)
+# Perform Fuzzy C-Means clustering with 3 clusters
+fcm_model <- cmeans(third_down_data$completion_percentage_2, centers = 3, m = 2, iter.max = 100, method = "cmeans")
+
+# Assign clusters based on maximum membership probability
+third_down_data$distance <- as.factor(apply(fcm_model$membership, 1, which.max))
+
+third_down_data <- third_down_data %>% 
+  mutate(distance = case_when(
+    distance == 3 ~ "Short",
+    distance == 2 ~ "Long",
+    distance == 1 ~ "Medium"
+  )) %>% 
+  select(-completion_percentage_2)
+
+kable(
+  third_down_data,
+  col.names = c(
+    "Down",
+    "Dist",
+    "Conversion Rate",
+    "Dist Range"
+  ),
+  caption = "Third Down Distance and Range (Fuzzy C-means)",
+  digits = 3, # Limit decimals for numeric columns
+  align = "c"
+)
+```
+Second Down Fuzzy C-Means
+```{r, echo = echo}
+second_down_data <- data %>% 
+  filter(down == 2, ydstogo <= 10) %>% 
+  select(down, ydstogo, first_down_rush, first_down_pass) %>%
+  print(second_down_data) %>% 
+  group_by(down, ydstogo) %>% 
+  print(second_down_data) %>% 
+  summarise(
+    completion_percentage = ((sum(first_down_rush, na.rm = TRUE) + sum(first_down_pass, na.rm = TRUE)) / n()) * 100,
+    .groups = "drop"
+  )
+
+normalize <- function(x) (x - min(x)) / (max(x) - min(x))
+second_down_data$completion_percentage_2 <- normalize(second_down_data$completion_percentage)
+set.seed(123)
+# Perform Fuzzy C-Means clustering with 3 clusters
+fcm_model <- cmeans(second_down_data$completion_percentage_2, centers = 3, m = 2, iter.max = 100, method = "cmeans")
+
+# Assign clusters based on maximum membership probability
+second_down_data$distance <- as.factor(apply(fcm_model$membership, 1, which.max))
+
+
+second_down_data <- second_down_data %>% 
+  mutate(distance = case_when(
+    distance == 3 ~ "Short",
+    distance == 2 ~ "Long",
+    distance == 1 ~ "Medium"
+  ))%>% 
+  select(-completion_percentage_2)
+
+kable(
+  second_down_data,
+  col.names = c(
+    "Down",
+    "Dist",
+    "Conversion Rate",
+    "Dist Range"
+  ),
+  caption = "Second Down Distance and Range (Fuzzy C-means)",
+  digits = 3, # Limit decimals for numeric columns
+  align = "c"
+)
+```
+
+First Down Fuzzy C-Means
+```{r, echo = echo}
+first_down_data <- data %>% 
+  filter(down == 1, ydstogo <= 10) %>% 
+  select(down, ydstogo, first_down_rush, first_down_pass) %>%
+  print(first_down_data) %>% 
+  group_by(down, ydstogo) %>% 
+  print(first_down_data) %>% 
+  summarise(
+    completion_percentage = ((sum(first_down_rush, na.rm = TRUE) + sum(first_down_pass, na.rm = TRUE)) / n()) * 100,
+    .groups = "drop"
+  )
+
+normalize <- function(x) (x - min(x)) / (max(x) - min(x))
+first_down_data$completion_percentage_2 <- normalize(first_down_data$completion_percentage)
+set.seed(123)
+# Perform Fuzzy C-Means clustering with 3 clusters
+fcm_model <- cmeans(first_down_data$completion_percentage_2, centers = 3, m = 2, iter.max = 100, method = "cmeans")
+
+# Assign clusters based on maximum membership probability
+first_down_data$distance <- as.factor(apply(fcm_model$membership, 1, which.max))
+
+
+first_down_data <- first_down_data %>% 
+  mutate(distance = case_when(
+    distance == 3 ~ "Short",
+    distance == 2 ~ "Long",
+    distance == 1 ~ "Medium"
+  ))%>% 
+  select(-completion_percentage_2)
+
+kable(
+  first_down_data,
+  col.names = c(
+    "Down",
+    "Dist",
+    "Conversion Rate",
+    "Dist Range"
+  ),
+  caption = "First Down Distance and Range (Fuzzy C-means)",
+  digits = 3, # Limit decimals for numeric columns
+  align = "c"
+)
 ```
